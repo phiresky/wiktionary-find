@@ -1,0 +1,13 @@
+[package]
+name = "wiktionary-find"
+version = "0.1.0"
+authors = ["phiresky <phireskyde+git@gmail.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+parse_mediawiki_dump = "0.1.0"
+bzip2 = "0.3.3"
+parse_wiki_text = "0.1.5"
+parse_wiktionary_de = "0.1.0"
