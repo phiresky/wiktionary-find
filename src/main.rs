@@ -1,49 +1,75 @@
-use parse_wiki_text::{Configuration, Node};
 use parse_wiktionary_de::Flowing;
+use rayon::prelude::*;
+use std::io::Write;
 
 fn main() {
     let file = std::fs::File::open("data/dewiktionary-20191020-pages-articles.xml.bz2").unwrap();
     let file = std::io::BufReader::new(file);
     let file = bzip2::bufread::BzDecoder::new(file);
     let file = std::io::BufReader::new(file);
-    for result in parse_mediawiki_dump::parse(file) {
-        match result {
-            Err(error) => {
-                eprintln!("Error: {}", error);
-                break;
-            }
-            Ok(page) => {
-                if page.namespace == 0
-                    && match &page.format {
-                        None => false,
-                        Some(format) => format == "text/x-wiki",
+    // let pb = std::sync::Mutex::new(pbr::ProgressBar::on(std::io::stderr(), 1545237));
+
+    /*let all: Vec<_> = */parse_mediawiki_dump::parse(file)
+        .par_bridge()
+        .filter_map(|result| {
+            match result {
+                Err(error) => {
+                    eprintln!("Error: {}", error);
+                    return None;
+                }
+                Ok(page) => {
+                    if page.namespace == 0
+                        && match &page.format {
+                            None => false,
+                            Some(format) => format == "text/x-wiki",
+                        }
+                        && match &page.model {
+                            None => false,
+                            Some(model) => model == "wikitext",
+                        }
+                    {
+                        /*println!(
+                            "The page {title:?} is an ordinary article with byte length {length}.",
+                            title = page.title,
+                            length = page.text.len()
+                        );*/
+                        if let Some(p) = parse_single_article(&page.title, &page.text) {
+                            let mut x: Vec<_> = p
+                                .pos_entries
+                                .iter()
+                                .flat_map(|p| p.ipa.iter())
+                                .filter_map(|p| match p {
+                                    Flowing::Ipa { ipa } => Some(ipa.to_owned()),
+                                    _ => None,
+                                })
+                                .collect();
+                            x.sort();
+                            x.dedup();
+                            if x.len() > 0 {
+                                return Some(format!("{}: {}", page.title, x.join(", ")));
+                            }
+                        }
+                    } else {
+                        //println!("The page {:?} has something special to it.", page.title);
                     }
-                    && match &page.model {
-                        None => false,
-                        Some(model) => model == "wikitext",
-                    }
-                {
-                    /*println!(
-                        "The page {title:?} is an ordinary article with byte length {length}.",
-                        title = page.title,
-                        length = page.text.len()
-                    );*/
-                    if let Some(p) = parse_single_article(&page.title, &page.text) {
-                        let x: Vec<_> = p.pos_entries.iter().flat_map(|p| p.ipa.iter()).filter_map(|p| match p {
-                            Flowing::Ipa{ipa} => Some(ipa.to_owned()),
-                            _ => None
-                        }).collect();
-                        
-                        println!("{}: {}", page.title, x.join(", "));
-                        
-                    }
-                    
-                } else {
-                    //println!("The page {:?} has something special to it.", page.title);
+                    return None;
                 }
             }
-        }
-    }
+        })
+        .for_each(|e| println!("{}", e));
+        /*
+        .map(|e| {
+            pb.lock().unwrap().inc();
+            e
+        })
+        .collect();
+        println!("writing!");*/
+    /*let stdo = std::io::stdout();
+    let mut x = stdo.lock();
+    for v in all {
+        x.write(v.as_bytes()).unwrap();
+        x.write(b"\n").unwrap();
+    }*/
 }
 
 fn parse_single_article<'a>(
@@ -103,7 +129,11 @@ fn parse_single_article<'a>(
             snippet_end = &wiki_text[warning_end..snippet_end]
         );
     }*/
-    let ents:Vec<_> = result.language_entries.into_iter().filter(|p| p.language == parse_wiktionary_de::Language::De).collect();
+    let ents: Vec<_> = result
+        .language_entries
+        .into_iter()
+        .filter(|p| p.language == parse_wiktionary_de::Language::De)
+        .collect();
     //if ents.len() > 2 {
     //    panic!("multiple entries?")
     //}

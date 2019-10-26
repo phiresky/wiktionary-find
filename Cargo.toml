@@ -11,3 +11,10 @@ parse_mediawiki_dump = "0.1.0"
 bzip2 = "0.3.3"
 parse_wiki_text = "0.1.5"
 parse_wiktionary_de = "0.1.0"
+rayon = "1.2.0"
+pbr = "1.0.2"
+
+
+[profile.release]
+opt-level = 3
+lto = true
